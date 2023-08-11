@@ -187,7 +187,7 @@
 					<div class='r'>
 						<a href='[playeropt_link(M, "checkhealth")]'>Check</a> &bull;
 						<a href='[playeropt_link(M, "revive")]'>Heal</a> &bull;
-						[(M.stat == 2 || M.max_health == 0) ? "Dead" : "[round(100 * M.health / M.max_health)]%"] &bull;
+						[(isdead(M) || M.max_health == 0) ? "Dead" : "[round(100 * M.health / M.max_health)]%"] &bull;
 						<a href='[playeropt_link(M, "kill")]'>Kill</a>
 					</div>
 					"} : ""]
@@ -240,7 +240,8 @@
 						<a href='[playeropt_link(M, "firegib")]'>Fire</a> &bull;
 						<a href='[playeropt_link(M, "elecgib")]'>Elec</a> &bull;
 						<a href='[playeropt_link(M, "icegib")]'>Ice</a> &bull;
-						<a href='[playeropt_link(M, "goldgib")]'>Gold</a>
+						<a href='[playeropt_link(M, "goldgib")]'>Gold</a> &bull;
+						<a href='[playeropt_link(M, "smite")]'>Smite</a>
 						<br>
 						<a href='[playeropt_link(M, "owlgib")]'>Owl</a> &bull;
 						<a href='[playeropt_link(M, "sharkgib")]'>Shark</a> &bull;

@@ -10,12 +10,12 @@
 	can_throw = FALSE
 	can_grab = TRUE
 	can_disarm = FALSE
-	butcherable = TRUE
+	butcherable = BUTCHER_ALLOWED
 	name_the_meat = FALSE
 	max_skins = 1
-	health_brute = 25
+	health_brute = 15
 	health_brute_vuln = 0.5
-	health_burn = 25
+	health_burn = 15
 	health_burn_vuln = 0.25
 	ai_type = /datum/aiHolder/aggressive
 	is_npc = TRUE

@@ -149,6 +149,12 @@
 	bullet_act()
 		return
 
+	proc/get_encounter_size(size, P)
+		. = size
+		if(!P || prob(P))
+			var/max_r = round(min(width,height)/2)-1
+			. = rand(size, max_r)
+
 	proc/erase_area()
 		var/turf/origin = get_turf(src)
 		for (var/turf/T in block(origin, locate(origin.x + width - 1, origin.y + height - 1, origin.z)))
@@ -546,7 +552,7 @@
 	proc/build_icon()
 		src.ClearAllOverlays()
 
-		if (damage_overlays.len == 4)
+		if (length(damage_overlays) == 4)
 			switch(src.health)
 				if (70 to 94)
 					src.UpdateOverlays(damage_overlays[1], "magnet_damage")
@@ -846,7 +852,11 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 	))
 /turf/simulated/wall/auto/asteroid
 	icon = 'icons/turf/walls_asteroid.dmi'
+#ifdef PERSPECTIVE_EDITOR_WALL
+	icon_state = "asteroid-perspective-map"
+#else
 	icon_state = "asteroid-map"
+#endif
 	mod = "asteroid-"
 	light_mod = "wall-"
 	plane = PLANE_WALL-1
@@ -1188,6 +1198,8 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 		src.ClearAllOverlays() // i know theres probably a better way to handle this
 		if(light)
 			src.UpdateOverlays(light, "ambient")
+		if(src.fullbright)
+			src.UpdateOverlays(new/image/fullbright, "fullbright")
 		src.top_overlays()
 		src.ore_overlays()
 
@@ -1214,6 +1226,11 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 			edge_overlay.color = src.stone_color
 			A.UpdateOverlays(edge_overlay, "ast_edge_[get_dir(A,src)]")
 			src.space_overlays += edge_overlay
+
+	Del()
+		for(var/turf/T in orange(src, 1))
+			T.ClearSpecificOverlays("ast_edge_[get_dir(T, src)]")
+		..()
 
 	proc/dig_asteroid(var/mob/living/user, var/obj/item/mining_tool/tool)
 		if (!user || !tool || !istype(src)) return
@@ -1320,12 +1337,14 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 				MAT.set_loc(src)
 
 				if(MAT.material)
-					if(MAT.material.quality != 0) //If it's 0 then that's probably the default, so let's use the asteroids quality only if it's higher. That way materials that have a quality by default will not occur at any quality less than the set one. And materials that do not have a quality by default, use the asteroids quality instead.
-						var/newQual = max(MAT.material.quality, src.quality)
-						MAT.material.quality = newQual
+					//If we don't use quality anymore, remove this
+					MAT.material = MAT.material.getMutable()
+					if(MAT.material.getQuality() != 0) //If it's 0 then that's probably the default, so let's use the asteroids quality only if it's higher. That way materials that have a quality by default will not occur at any quality less than the set one. And materials that do not have a quality by default, use the asteroids quality instead.
+						var/newQual = max(MAT.material.getQuality(), src.quality)
+						MAT.material.setQuality(newQual)
 						MAT.quality = newQual
 					else
-						MAT.material.quality = src.quality
+						MAT.material.setQuality(src.quality)
 						MAT.quality = src.quality
 
 				MAT.name = getOreQualityName(MAT.quality) + " [MAT.name]"
@@ -1333,7 +1352,7 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 			icon_old = icon_state
 
 		var/new_color = src.stone_color
-		src.RL_SetOpacity(0)
+		src.set_opacity(0)
 		src.ReplaceWith(src.replace_type, FALSE)
 		src.stone_color = new_color
 		src.set_opacity(0)
@@ -1376,13 +1395,15 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 			var/turf/simulated/wall/auto/asteroid/AST
 			while (distributions > 0)
 				distributions--
-				if (usable_turfs.len < 1)
+				if (length(usable_turfs) < 1)
 					break
 				AST = pick(usable_turfs)
 				AST.event = E
 				E.onGenerate(AST)
 				usable_turfs -= AST
 
+TYPEINFO(/turf/simulated/floor/plating/airless/asteroid)
+	mat_appearances_to_ignore = list("rock")
 /turf/simulated/floor/plating/airless/asteroid
 	name = "asteroid"
 	icon = 'icons/turf/walls_asteroid.dmi'
@@ -1398,7 +1419,6 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 	var/stone_color = "#D1E6FF"
 	var/image/coloration_overlay = null
 	var/list/space_overlays = null
-	mat_appearances_to_ignore = list("rock")
 	turf_flags = MOB_SLIP | MOB_STEP | IS_TYPE_SIMULATED | FLUID_MOVE
 
 #ifdef UNDERWATER_MAP
@@ -1480,11 +1500,67 @@ TYPEINFO_NEW(/turf/simulated/wall/auto/asteroid)
 			A.UpdateOverlays(edge_overlay, "ast_edge_[get_dir(A,src)]")
 			src.space_overlays += edge_overlay
 
+	Del()
+		for(var/turf/T in orange(src, 1))
+			T.ClearSpecificOverlays("ast_edge_[get_dir(T, src)]")
+		..()
+
 
 /turf/simulated/floor/plating/airless/asteroid/jean
 	name = "jasteroid"
 	desc = "A free-floating jineral jeposit from space."
 	stone_color = "#88c2ff"
+
+/turf/simulated/floor/plating/airless/asteroid/comet
+	name = "regolith"
+	desc = "It's dusty and cold."
+	stone_color = "#7d93ad"
+	color = "#7d93ad"
+
+	ice
+		name = "comet ice"
+		stone_color = "#a8cdfa"
+		color = "#a8cdfa"
+
+	ice_dense
+		name = "dense ice"
+		desc = "A compressed layer of comet ice."
+		stone_color = "#2070CC"
+		color = "#2070CC"
+
+	ice_char
+		name = "dark regolith"
+		desc = "An inky-black assortment of carbon-rich dust and ice."
+		stone_color = "#111111"
+		color = "#111111"
+
+	glassy
+		name = "blasted regolith"
+		desc = "This stuff has been blasted and fused by stellar radiation and impacts."
+		stone_color = "#111111"
+		color = "#111111"
+
+	copper
+		name = "metallic rock"
+		desc = "Rich in soft metals."
+		stone_color = "#553333"
+		color = "#553333"
+
+	iron
+		name = "ferrous rock"
+		desc = "Dense metallic rock."
+		stone_color = "#333333"
+		color = "#333333"
+
+	plasma
+		name = "plasma ice"
+		desc = "Concentrated plasma trapped in dense ice."
+
+	radioactive
+		name = "radioactive metal"
+		desc = "There's a hazardous amount of radioactive material in this metallic layer."
+		stone_color = "#114444"
+		color = "#114444"
 
 
 // Tool Defines
@@ -2014,10 +2090,14 @@ TYPEINFO(/obj/item/cargotele)
 		// And logs for good measure (Convair880).
 		var/obj/storage/S = cargo
 		ENSURE_TYPE(S)
-
+		var/mob_teled = FALSE
 		for (var/mob/M in cargo.contents)
 			if (M)
 				logTheThing(LOG_STATION, user, "uses a cargo transporter to send [cargo.name][S && S.locked ? " (locked)" : ""][S && S.welded ? " (welded)" : ""] with [constructTarget(M,"station")] inside to [log_loc(src.target)].")
+				mob_teled = TRUE
+
+		if(!mob_teled)
+			logTheThing(LOG_STATION, user, "uses a cargo transporter to send [cargo.name][S && S.locked ? " (locked)" : ""][S && S.welded ? " (welded)" : ""] to [log_loc(src.target)].")
 
 		cargo.set_loc(get_turf(src.target))
 		target.receive_cargo(cargo)
@@ -2036,19 +2116,10 @@ TYPEINFO(/obj/item/cargotele)
 
 /obj/item/cargotele/traitor
 	cost = 15
-	var/static/list/possible_targets = list()
 	///The account to credit for sales
 	var/datum/db_record/account = null
 	///The total amount earned from selling/stealing
 	var/total_earned = 0
-
-	New()
-		..()
-		if (!length(possible_targets))
-			for(var/turf/T in world) //hate to do this but it's only once vOv
-				LAGCHECK(LAG_LOW)
-				if(istype(T,/turf/space) && T.z != 1 && T.z != 6 && !isrestrictedz(T.z)) //do not foot ball, do not collect 200
-					possible_targets += T
 
 	attack_self() // Fixed --melon
 		return
@@ -2065,10 +2136,7 @@ TYPEINFO(/obj/item/cargotele)
 			store.weld(TRUE, user)
 
 	finish_teleport(var/obj/cargo, var/mob/user)
-		if (!length(src.possible_targets))
-			src.target = locate(rand(1,world.maxx), rand(1,world.maxy), 1)
-		else
-			src.target = pick(src.possible_targets)
+		src.target = random_space_turf() || random_nonrestrictedz_turf()
 		boutput(user, "<span class='notice'>Teleporting [cargo]...</span>")
 		playsound(user.loc, 'sound/machines/click.ogg', 50, 1)
 		var/value = shippingmarket.appraise_value(cargo.contents, sell = FALSE)
@@ -2156,7 +2224,7 @@ TYPEINFO(/obj/item/cargotele)
 			if (E.scan_decal)
 				mining_scandecal(L, AST, E.scan_decal)
 	var/found_string = ""
-	if (ores_found.len > 0)
+	if (length(ores_found) > 0)
 		var/list_counter = 1
 		for (var/X in ores_found)
 			found_string += X
@@ -2536,7 +2604,7 @@ TYPEINFO(/obj/item/ore_scoop)
 			if (!satchel)
 				boutput(user, "<span class='alert'>There's no satchel in [src] to dump out.</span>")
 				return
-			if (satchel.contents.len < 1)
+			if (length(satchel.contents) < 1)
 				boutput(user, "<span class='alert'>The satchel in [src] is empty.</span>")
 				return
 			user.visible_message("[user] dumps out [src]'s satchel contents.", "You dump out [src]'s satchel contents.")
@@ -2586,7 +2654,7 @@ TYPEINFO(/obj/item/ore_scoop)
 	ex_act(severity)
 		if (severity == 1.0)
 			if (prob(8))
-				src.RL_SetOpacity(0)
+				src.set_opacity(0)
 				src.set_density(0)
 				src.icon_state = "ancient-b"
 				return

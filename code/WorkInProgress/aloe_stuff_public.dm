@@ -45,7 +45,7 @@
 	desc = "Very fuzzy, likes to roll over."
 	death_text = "%src% rolls over!"
 	icon_state = "catbrix"
-	butcherable = FALSE
+	butcherable = BUTCHER_NOT_ALLOWED
 	health = 30
 	randomize_name = 0
 	randomize_look = 0
@@ -81,19 +81,14 @@
 		..()
 		src.occupant = new /mob/living/critter/small_animal/cat/brixley(src)
 		src.build_icon()
-/obj/item/storage/desk_drawer/aloe
-	spawn_contents = list(/obj/item/reagent_containers/patch/LSD,
-						  /obj/item/reagent_containers/patch/lsd_bee,
-						  /obj/item/cloth/handkerchief/nt,
-						  /obj/item/aiModule/hologram_expansion/elden,
-						  /obj/item/straw/fast,
-	)
 
 /obj/table/wood/auto/desk/aloe
-	New()
-		..()
-		var/obj/item/storage/desk_drawer/aloe/drawer = new(src)
-		src.desk_drawer = drawer
+	has_drawer = TRUE
+	drawer_contents = list(/obj/item/reagent_containers/patch/LSD,
+							/obj/item/reagent_containers/patch/lsd_bee,
+							/obj/item/cloth/handkerchief/nt,
+							/obj/item/aiModule/hologram_expansion/elden,
+							/obj/item/straw/fast)
 
 /area/centcom/offices/aloe
 	name = "\proper office of aloe"

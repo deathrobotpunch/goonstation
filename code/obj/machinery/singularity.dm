@@ -98,7 +98,7 @@ TYPEINFO(/obj/machinery/the_singularitygen)
 	anchored = ANCHORED
 	density = 1
 	event_handler_flags = IMMUNE_SINGULARITY
-	deconstruct_flags = DECON_WELDER | DECON_MULTITOOL
+	deconstruct_flags = DECON_NONE
 
 
 	pixel_x = -16
@@ -116,7 +116,9 @@ TYPEINFO(/obj/machinery/the_singularitygen)
 	var/radius = 0 //the variable used for all calculations involving size.this is the current size
 	var/maxradius = INFINITY//the maximum size the singularity can grow to
 	var/restricted_z_allowed = FALSE
-
+	var/right_spinning //! boolean for the spaghettification animation spin direction
+	///Count for rate-limiting the spaghettification effect
+	var/spaget_count = 0
 
 
 #ifdef SINGULARITY_TIME
@@ -127,6 +129,7 @@ for some reason I brought it back and tried to clean it up a bit and I regret ev
 */
 /obj/machinery/the_singularity/New(loc, var/E = 100, var/Ti = null,var/rad = 2)
 	START_TRACKING
+	START_TRACKING_CAT(TR_CAT_GHOST_OBSERVABLES)
 	src.energy = E
 	maxradius = rad
 	if(maxradius<2)
@@ -138,6 +141,7 @@ for some reason I brought it back and tried to clean it up a bit and I regret ev
 	event()
 	if (Ti)
 		src.Dtime = Ti
+	right_spinning = prob(50)
 
 	var/offset = rand(1000)
 	add_filter("loose rays", 1, rays_filter(size=1, density=10, factor=0, offset=offset, threshold=0.2, color="#c0c", x=0, y=0))
@@ -155,6 +159,7 @@ for some reason I brought it back and tried to clean it up a bit and I regret ev
 
 /obj/machinery/the_singularity/disposing()
 	STOP_TRACKING
+	STOP_TRACKING_CAT(TR_CAT_GHOST_OBSERVABLES)
 	. = ..()
 
 /obj/machinery/the_singularity/process()
@@ -275,20 +280,35 @@ for some reason I brought it back and tried to clean it up a bit and I regret ev
 	if(QDELETED(A)) // Don't bump that which no longer exists
 		return
 
-	var/icon/spaget = getFlatIcon(A)
-	var/obj/dummy/spaget_overlay = new()
-	spaget_overlay.icon = spaget
-	spaget_overlay.appearance_flags |= RESET_COLOR | RESET_ALPHA | RESET_TRANSFORM
-	spaget_overlay.pixel_x = A.pixel_x+(A.x - src.x)*32
-	spaget_overlay.pixel_y = A.pixel_y+(A.y - src.y)*32
-	spaget_overlay.mouse_opacity = 0
-	spaget_overlay.transform = A.transform
-	var/angle = get_angle(A, src)
-	var/matrix/flatten = matrix((A.x - src.x)*(cos(angle)), 0, 16-spaget_overlay.pixel_x, (A.y - src.y)*(sin(angle)), 0, 16-spaget_overlay.pixel_y)
-	animate(spaget_overlay, 3 SECONDS, FALSE, QUAD_EASING, 0, alpha=0, transform=flatten)
-	src.vis_contents += spaget_overlay
-	SPAWN(4 SECONDS)
-		qdel(spaget_overlay)
+	if(src.spaget_count < 25)
+		src.spaget_count++
+		var/spaget_time = 15 SECONDS
+		var/obj/dummy/spaget_overlay = new()
+		spaget_overlay.appearance = A.appearance
+		spaget_overlay.appearance_flags = RESET_COLOR | RESET_ALPHA | PIXEL_SCALE
+		spaget_overlay.pixel_x = A.pixel_x + (A.x - src.x + 0.5)*32
+		spaget_overlay.pixel_y = A.pixel_y + (A.y - src.y + 0.5)*32
+		spaget_overlay.vis_flags = 0
+		spaget_overlay.plane = PLANE_DEFAULT
+		spaget_overlay.mouse_opacity = 0
+		spaget_overlay.transform = A.transform
+		if(prob(0.1)) // easteregg
+			spaget_overlay.icon = 'icons/obj/foodNdrink/food_meals.dmi'
+			spaget_overlay.icon_state = "spag-dish"
+			spaget_overlay.Scale(2, 2)
+		var/angle = get_angle(A, src)
+		var/matrix/flatten = matrix((A.x - src.x)*(cos(angle)), 0, -spaget_overlay.pixel_x, (A.y - src.y)*(sin(angle)), 0, -spaget_overlay.pixel_y)
+		animate(spaget_overlay, spaget_time, FALSE, QUAD_EASING, 0, alpha=0, transform=flatten)
+		var/obj/dummy/spaget_turner = new()
+		spaget_turner.vis_contents += spaget_overlay
+		spaget_turner.mouse_opacity = 0
+		spaget_turner.appearance_flags = RESET_COLOR | RESET_ALPHA | RESET_TRANSFORM | KEEP_TOGETHER
+		animate_spin(spaget_turner, right_spinning ? "R" : "L", spaget_time / 8 + randfloat(-2, 2), looping=2, parallel=FALSE)
+		src.vis_contents += spaget_turner
+		SPAWN(spaget_time + 1 SECOND)
+			src.spaget_count--
+			qdel(spaget_overlay)
+			qdel(spaget_turner)
 
 	if (isliving(A) && !isintangible(A))//if its a mob
 		var/mob/living/L = A
@@ -396,7 +416,7 @@ for some reason I brought it back and tried to clean it up a bit and I regret ev
 /////////////////////////////////////////////Controls which "event" is called
 /obj/machinery/the_singularity/proc/event()
 	var/numb = rand(1,3)
-	if(prob(25))
+	if(prob(25 / max(radius, 1)))
 		grow()
 	switch (numb)
 		if (1)//Eats the turfs around it
@@ -434,7 +454,7 @@ for some reason I brought it back and tried to clean it up a bit and I regret ev
 
 /obj/machinery/the_singularity/proc/BHolerip()
 	var/turf/sing_center = src.get_center()
-	for (var/turf/T in orange(radius*EVENT_GROWTH, sing_center))
+	for (var/turf/T in orange(radius+EVENT_GROWTH+0.5, sing_center))
 		if (prob(70))
 			continue
 

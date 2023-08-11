@@ -26,6 +26,8 @@
 	throwforce = 10
 	pressure_resistance = 3*ONE_ATMOSPHERE
 	layer = STORAGE_LAYER //dumb
+	default_material = "steel"
+	uses_material_appearance = FALSE
 	var/allow_unbuckle = 1
 	var/mob/living/buckled_guy = null
 	var/deconstructable = 1
@@ -182,12 +184,13 @@
 	desc = "Like a bar stool, but in electric blue."
 	parts_type = /obj/item/furniture_parts/stool/neon
 
+TYPEINFO(/obj/stool/wooden)
+	mat_appearances_to_ignore = list("wood")
 /obj/stool/wooden
 	name = "wooden stool"
 	icon_state = "wstool"
 	desc = "Like a stool, but just made out of wood."
 	parts_type = /obj/item/furniture_parts/woodenstool
-	mat_appearances_to_ignore = list("wood")
 
 	constructed //no "wood wood stool"
 		name = "stool"
@@ -531,10 +534,13 @@
 /* ================================================ */
 /* -------------------- Chairs -------------------- */
 /* ================================================ */
+TYPEINFO(/obj/stool/chair)
+	mat_appearances_to_ignore = list("steel")
 
 /obj/stool/chair
 	name = "chair"
 	desc = "A four-legged metal chair, rigid and slightly uncomfortable. Helpful when you don't want to use your legs at the moment."
+	HELP_MESSAGE_OVERRIDE("")
 	icon_state = "chair"
 	var/comfort_value = 3
 	var/buckledIn = 0
@@ -553,6 +559,15 @@
 
 	moveable
 		anchored = UNANCHORED
+
+	get_help_message(dist, mob/user)
+		. = "You can <b>sit</b> on it by standing on the same tile then click draging yourself to the chair or using the Block hotkey with any intent except <b>Grab</b>. "
+		if (src.climbable)
+			. += "It will be <b>climbed on</b> if you are using the <b>Grab intent</b>. "
+		if (src.foldable)
+			. += "It can be <b>folded</b> up to carry by clicking on it. "
+		if (src.securable)
+			. += "It can be <b>secured to the floor</b> with a screwing tool."
 
 	New()
 		if (src.dir == NORTH)
@@ -875,12 +890,32 @@
 		return
 
 /* ======================================================= */
+/* -------------------- Material Chairs ------------------ */
+/* ======================================================= */
+
+/obj/stool/chair/material
+	name = "material chair"
+	desc = "A chair made from a material"
+	uses_material_appearance = TRUE
+	mat_changename = TRUE
+
+/obj/stool/chair/material/mauxite
+	name = "chair"
+	icon_state = "chair$$mauxite"
+	desc = "A sturdy chair. It doesn't look very comfortable..."
+	comfort_value = -2
+	default_material = "mauxite"
+
+/* ======================================================= */
 /* -------------------- Folded Chairs -------------------- */
 /* ======================================================= */
 
+TYPEINFO(/obj/item/chair/folded)
+	mat_appearances_to_ignore = list("steel")
 /obj/item/chair/folded
 	name = "chair"
 	desc = "A folded chair. Good for smashing noggin-shaped things."
+	HELP_MESSAGE_OVERRIDE("It can be unfolded back into a chair by <b>using it<b> with the C key.")
 	icon = 'icons/obj/furniture/chairs.dmi'
 	icon_state = "folded_chair"
 	item_state = "folded_chair"
@@ -1056,6 +1091,8 @@
 TYPEINFO(/obj/stool/chair/comfy/wheelchair)
 	mats = 15
 
+TYPEINFO(/obj/stool/chair/comfy/wheelchair)
+	mat_appearances_to_ignore = list("steel")
 /obj/stool/chair/comfy/wheelchair
 	name = "wheelchair"
 	desc = "It's a chair that has wheels attached to it. Do I really have to explain this to you? Can you not figure this out on your own? Wheelchair. Wheel, chair. Chair that has wheels."
@@ -1068,7 +1105,6 @@ TYPEINFO(/obj/stool/chair/comfy/wheelchair)
 	scoot_sounds = list('sound/misc/chair/office/scoot1.ogg', 'sound/misc/chair/office/scoot2.ogg', 'sound/misc/chair/office/scoot3.ogg', 'sound/misc/chair/office/scoot4.ogg', 'sound/misc/chair/office/scoot5.ogg')
 	var/lying = 0 // didja get knocked over? fall down some stairs?
 	parts_type = /obj/item/furniture_parts/wheelchair
-	mat_appearances_to_ignore = list("steel")
 
 	New()
 		..()
@@ -1137,6 +1173,8 @@ TYPEINFO(/obj/stool/chair/comfy/wheelchair)
 /* -------------------- Wooden Chairs -------------------- */
 /* ======================================================= */
 
+TYPEINFO(/obj/stool/chair/wooden)
+	mat_appearances_to_ignore = list("wood")
 /obj/stool/chair/wooden
 	name = "wooden chair"
 	icon_state = "chair_wooden" // this sprite is bad I will fix it at some point
@@ -1145,7 +1183,6 @@ TYPEINFO(/obj/stool/chair/comfy/wheelchair)
 	anchored = UNANCHORED
 	//deconstructable = 0
 	parts_type = /obj/item/furniture_parts/wood_chair
-	mat_appearances_to_ignore = list("wood")
 
 	constructed //no "wood wood chair"
 		name = "chair"
@@ -1245,9 +1282,9 @@ TYPEINFO(/obj/stool/chair/comfy/wheelchair)
 	/obj/item/reagent_containers/food/snacks/candy/candyheart,
 	/obj/item/bananapeel,
 	/obj/item/reagent_containers/food/snacks/candy/lollipop/random_medical,
-	/obj/item/spacecash/random/small,
-	/obj/item/spacecash/random/tourist,
-	/obj/item/spacecash/buttcoin)
+	/obj/item/currency/spacecash/small,
+	/obj/item/currency/spacecash/tourist,
+	/obj/item/currency/spacecash/buttcoin)
 
 	New()
 		..()
@@ -1494,7 +1531,7 @@ TYPEINFO(/obj/stool/chair/comfy/wheelchair)
 
 		if (netnum)
 			var/datum/powernet/PN
-			if (powernets && powernets.len >= netnum)
+			if (powernets && length(powernets) >= netnum)
 				PN = powernets[netnum]
 				return PN.avail
 

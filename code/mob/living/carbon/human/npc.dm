@@ -1,6 +1,5 @@
 
 #define IS_NPC_HATED_ITEM(x) ( \
-		istype(x, /obj/item/clothing/suit/straight_jacket) || \
 		istype(x, /obj/item/handcuffs) || \
 		istype(x, /obj/item/device/radio/electropack) || \
 		x:block_vision \
@@ -244,22 +243,6 @@
 
 	ai_lastaction = world.time
 	ai_actiondelay = action_delay
-
-
-/*
-/mob/living/carbon/human/proc/ai_findtarget()
-	var/tempmob
-	for (var/mob/living/carbon/M in view(7,src))
-		if (M.stat > 0 || !M.client || M == src || M.is_npc) continue
-		if (!tempmob) tempmob = M
-		for(var/mob/living/carbon/human/L in oview(7,src))
-			if (L.ai_target == tempmob && prob(50)) continue
-		if (M.health < tempmob:health) tempmob = M
-	if(tempmob)
-		ai_target = tempmob
-		ai_state = AI_ANGERING
-		ai_threatened = world.timeofday
-*/
 
 /mob/living/carbon/human/proc/ai_is_valid_target(mob/M)
 	return TRUE
@@ -581,6 +564,12 @@
 			throw_equipped |= prob(80)
 		else if(length(I.storage.get_contents()))
 			var/obj/item/taken = pick(I.storage.get_contents())
+			if(taken.anchored) //Item anchored inside storage. AI shouldnt be able to take it out component. "MechComp"
+				return
+			if(istype(I, /obj/item/storage/mechanics)) //Checks if mech cover is closed if so ignore items inside.
+				var/obj/item/storage/mechanics/mechitem = I
+				if(!mechitem.open)
+					return
 			src.u_equip(I)
 			I.set_loc(src.loc)
 			I.dropped(src)

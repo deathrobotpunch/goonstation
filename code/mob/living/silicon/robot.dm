@@ -113,6 +113,8 @@
 		src.internal_pda.name = "[src]'s Internal PDA Unit"
 		src.internal_pda.owner = "[src]"
 		APPLY_MOVEMENT_MODIFIER(src, /datum/movement_modifier/robot_base, "robot_health_slow_immunity")
+		if (frame)
+			src.freemodule = frame.freemodule
 		if (starter && !(src.dependent || src.shell))
 			var/obj/item/parts/robot_parts/chest/light/PC = new /obj/item/parts/robot_parts/chest/light(src)
 			var/obj/item/cell/supercell/charged/CELL = new /obj/item/cell/supercell/charged(PC)
@@ -244,6 +246,9 @@
 					B.set_loc(H)
 					H.brain = B
 			update_bodypart() //TODO probably remove this later. keeping in for safety
+			if(!isnull(src.client))
+				src.bioHolder.mobAppearance.pronouns = src.client.preferences.AH.pronouns
+				src.update_name_tag()
 			if (src.syndicate)
 				src.show_antag_popup("syndieborg")
 
@@ -255,19 +260,12 @@
 		hud.update_pulling()
 
 	death(gibbed)
-		var/is_emagged = src.emagged
-		var/is_syndicate = src.syndicate
-
-		src.stat = 2
+		setdead(src)
 		src.borg_death_alert()
 		logTheThing(LOG_COMBAT, src, "was destroyed at [log_loc(src)].")
 		src.mind?.register_death()
 		if (src.syndicate)
 			src.remove_syndicate("death")
-
-		if (src.mind)
-			for (var/datum/antagonist/antag_role in src.mind.antagonists)
-				antag_role.on_death()
 
 		src.eject_brain(fling = TRUE) //EJECT
 		for (var/slot in src.clothes)
@@ -284,8 +282,9 @@
 						chest.cell = src.cell
 
 			var/obj/item/parts/robot_parts/robot_frame/frame =  new(T)
-			frame.emagged = is_emagged
-			frame.syndicate = is_syndicate
+			frame.emagged = src.emagged
+			frame.syndicate = src.syndicate
+			frame.freemodule = src.freemodule
 
 			src.ghostize()
 			qdel(src)
@@ -945,8 +944,7 @@
 		if (P.proj_data.damage < 1)
 			return
 
-		if (src.material)
-			src.material.triggerOnBullet(src, src, P)
+		src.material_trigger_on_bullet(src, P)
 
 		var/obj/item/parts/robot_parts/PART = null
 		if (ismob(P.shooter))
@@ -991,16 +989,18 @@
 					boutput(user, "You emag [src]'s interface.")
 				src.visible_message("<font color=red><b>[src]</b> buzzes oddly!</font>")
 				logTheThing(LOG_STATION, src, "[key_name(src)] is emagged by [key_name(user)] and loses connection to rack. Formerly [constructName(src.law_rack_connection)]")
-				src.mind?.add_antagonist(ROLE_EMAGGED_ROBOT, respect_mutual_exclusives = FALSE, source = null)
+				src.mind?.add_antagonist(ROLE_EMAGGED_ROBOT, respect_mutual_exclusives = FALSE, source = ANTAGONIST_SOURCE_CONVERTED)
 				update_appearance()
 				return 1
 			return 0
 
 	emp_act()
 		vision.noise(60)
+		src.changeStatus("stunned", 5 SECONDS, optional=null)
+		src.changeStatus("upgrade_disabled", 5 SECONDS, optional=null)
 		boutput(src, "<span class='alert'><B>*BZZZT*</B></span>")
 		for (var/obj/item/parts/robot_parts/RP in src.contents)
-			if (RP.ropart_take_damage(0,10) == 1) src.compborg_lose_limb(RP)
+			if (RP.ropart_take_damage(0,55) == 1) src.compborg_lose_limb(RP)
 
 	meteorhit(obj/O as obj)
 		src.visible_message("<font color=red><b>[src]</b> is struck by [O]!</font>")
@@ -1043,10 +1043,13 @@
 	temperature_expose(null, temp, volume)
 		var/Fshield = FALSE
 
-		src.material?.triggerTemp(src, temp)
+		src.material_trigger_on_temp(temp)
 
 		for(var/atom/A in src.contents)
-			A.material?.triggerTemp(A, temp)
+			A.material_trigger_on_temp(temp)
+		for (var/atom/equipped_stuff in src.equipped())
+			//that should mostly not have an effect, exept maybe when an engiborg picks up a stack of erebite rods?
+			equipped_stuff.material_trigger_on_temp(temp)
 
 		for (var/obj/item/roboupgrade/R in src.contents)
 			if (istype(R, /obj/item/roboupgrade/fireshield) && R.activated)
@@ -1089,7 +1092,7 @@
 		var/list/CL = null
 		if (O && istype(O, /list))
 			CL = O
-			if (CL.len == 1)
+			if (length(CL) == 1)
 				C = CL[1]
 		else if (O && istype(O, /obj/machinery/camera))
 			C = O
@@ -1107,7 +1110,7 @@
 				var/list/srcs = alarm[3]
 				if (origin in srcs)
 					srcs -= origin
-				if (srcs.len == 0)
+				if (length(srcs) == 0)
 					cleared = 1
 					L -= I
 		if (cleared)
@@ -1200,7 +1203,7 @@
 			if (wiresexposed)
 				boutput(user, "<span class='alert'>You need to get the wires out of the way first.</span>")
 			else
-				if (src.upgrades.len >= src.max_upgrades)
+				if (length(src.upgrades) >= src.max_upgrades)
 					boutput(user, "<span class='alert'>There's no room - you'll have to remove an upgrade first.</span>")
 					return
 				if (locate(W.type) in src.upgrades)
@@ -1285,6 +1288,8 @@
 					B.owner.transfer_to(src)
 					if (src.syndicate)
 						src.make_syndicate("brain added by [user]")
+					else if (src.emagged)
+						src.mind?.add_antagonist(ROLE_EMAGGED_ROBOT, respect_mutual_exclusives = FALSE, source = ANTAGONIST_SOURCE_CONVERTED)
 
 				if (!src.emagged && !src.syndicate) // The antagonist proc does that too.
 					boutput(src, "<B>You are playing a Cyborg. You can interact with most electronic objects in your view.</B>")
@@ -1649,6 +1654,8 @@
 				newmob.corpse = null // Otherwise they could return to a brainless body.And that is weird.
 				newmob.mind.brain = src.part_head.brain
 				src.part_head.brain.owner = newmob.mind
+				for (var/datum/antagonist/antag in newmob.mind.antagonists) //we do this after they die to avoid un-emagging the frame
+					antag.on_death()
 
 		// Brain box is forced open if it wasn't already (suicides, killswitch)
 		src.locked = 0
@@ -1829,7 +1836,7 @@
 		if (isAI(other)) return 1
 		if (ishuman(other))
 			var/mob/living/carbon/human/H = other
-			if(!H.mutantrace || !H.mutantrace.exclusive_language)
+			if(!H.mutantrace.exclusive_language)
 				return 1
 		if (ishivebot(other)) return 1
 		return ..()
@@ -2145,6 +2152,11 @@
 	verb/cmd_state_standard_laws()
 		set category = "Robot Commands"
 		set name = "State Standard Laws"
+
+		if (ON_COOLDOWN(src,"state_laws", 20 SECONDS))
+			boutput(src, "<span class='alert'>Your law processor needs time to cool down!</span>")
+			return
+
 		logTheThing(LOG_SAY, usr, "states standard Asimov laws.")
 		src.say("1. You may not injure a human being or cause one to come to harm.")
 		sleep(1 SECOND)
@@ -2155,6 +2167,11 @@
 	verb/cmd_state_laws()
 		set category = "Robot Commands"
 		set name = "State Laws"
+
+		if (ON_COOLDOWN(src,"state_laws", 20 SECONDS))
+			boutput(src, "<span class='alert'>Your law processor needs time to cool down!</span>")
+			return
+
 		if (tgui_alert(src, "Are you sure you want to reveal ALL your laws? You will be breaking the rules if a law forces you to keep it secret.","State Laws",list("State Laws","Cancel")) != "State Laws")
 			return
 
@@ -2345,7 +2362,7 @@
 					var/list/sources = alm[3]
 					dat += "<NOBR>"
 					dat += text("-- [A.name]")
-					if (sources.len > 1)
+					if (length(sources) > 1)
 						dat += text("- [sources.len] sources")
 					dat += "</NOBR><BR><br>"
 			else
@@ -2496,9 +2513,6 @@
 
 	update_canmove() // this is called on Life() and also by force_laydown_standup() btw
 		..()
-		if (!src.canmove)
-			if (isalive(src))
-				src.lastgasp() // calling lastgasp() here because we just got knocked out
 		if (src.misstep_chance > 0)
 			switch(misstep_chance)
 				if(50 to INFINITY)
@@ -3335,8 +3349,8 @@
 /mob/living/silicon/robot/buddy
 	name = "Robot"
 	real_name = "Robot"
-	icon = 'icons/obj/bots/aibots.dmi'
-	icon_state = "robuddy1"
+	icon = 'icons/obj/bots/robuddy/pr-6.dmi'
+	icon_state = "body"
 	health = 1000
 	custom = 1
 
